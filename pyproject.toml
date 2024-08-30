@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "nag"
+version = "0.1.0"
+description = ""
+authors = ["Olivier Richard <olivier.richard@imag.fr>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.10"
+click = ">=7.1.2"
+    
+[tool.poetry.scripts]
+nag = 'nag.main:cli'
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
