@@ -5,16 +5,34 @@ from subprocess import check_output
 import click
 
 
-@dataclass
 class GitLab:
     domain: str
     group: str
     owner: str
     repo: str
     rev: str
-    sha256: str
+    hash: str
+
+    def __init__(self, attrset):
+        self.domain = attrset["domain"]
+        self.group = attrset["group"]
+        self.owner = attrset["owner"]
+        self.repo = attrset["repo"]
+        self.rev = attrset["rev"]
+        self.hash = attrset["hash"] if "hash" in attrset else attrset["sha256"]
+
+    def git_url(self) -> str:
+        url = f"git@{self.domain}:{self.group}/{self.owner}/{self.repo}.git"
+        print(f"git_url: {url}")
+        return url
+
+    def https_url(self) -> str:
+        url = f"https://{self.domain}/{self.group}/{self.owner}/{self.repo}"
+        print(f"git_url: {url}")
+        return url
 
 
+# TODO
 @dataclass
 class Github:
     domain: str
@@ -22,7 +40,7 @@ class Github:
     owner: str
     repo: str
     rev: str
-    sha256: str
+    hash: str
 
     def git_url(self) -> str:
         url = f"git@{self.domain}:{self.group}/{self.owner}/{self.repo}.git"
@@ -53,9 +71,9 @@ def get_last_commit(git_url):
 
 def nix_prefetch_git(https_url, commit):
     result = check_output(["nix-prefetch-git", https_url, commit]).decode()
-    sha256 = re.search("sha256-.+=", result).group(0)
-    print(sha256)
-    return sha256
+    hash = re.search("sha256-.+=", result).group(0)
+    print(hash)
+    return hash
 
 
 def get_attr_val(attr_val, filename):
@@ -105,7 +123,7 @@ def get_src_value(ctx, filename):
             attrset[key] = val
 
     if ctx.obj.isGitLab:
-        ctx.obj.gitlab = GitLab(**attrset)
+        ctx.obj.gitlab = GitLab(attrset)
     elif ctx.obj.isGithub:
         ctx.obj.github = Github(**attrset)
     print(f"{attrset}")
@@ -130,7 +148,7 @@ def update(ctx, filename):
             git_url = ctx.obj.gitlab.git_url()
             https_url = ctx.obj.gitlab.https_url()
             commit_prev = ctx.obj.gitlab.rev
-            sha256_prev = ctx.obj.gitlab.sha256
+            hash_prev = ctx.obj.gitlab.hash
         else:
             print("Only Gitlab is supported (ATM)")
             exit(1)
@@ -138,9 +156,9 @@ def update(ctx, filename):
         if commit == commit_prev:
             print("Nothing to do, no more recent commit")
             exit(0)
-        sha256 = nix_prefetch_git(https_url, commit)
-        print(f"New commit: {commit}, new sha256 {sha256}")
-        new_src = ctx.obj.src.replace(commit_prev, commit).replace(sha256_prev, sha256)
+        hash = nix_prefetch_git(https_url, commit)
+        print(f"New commit: {commit}, new hash {hash}")
+        new_src = ctx.obj.src.replace(commit_prev, commit).replace(hash_prev, hash)
 
         check_output(["nix-editor", "-i", "-f", "-v", new_src, filename, "src"])
 
