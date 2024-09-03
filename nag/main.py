@@ -1,5 +1,4 @@
 import re
-from dataclasses import dataclass
 from subprocess import check_output
 
 import click
@@ -32,23 +31,25 @@ class GitLab:
         return url
 
 
-# TODO
-@dataclass
 class Github:
-    domain: str
-    group: str
     owner: str
     repo: str
     rev: str
     hash: str
 
+    def __init__(self, attrset):
+        self.owner = attrset["owner"]
+        self.repo = attrset["repo"]
+        self.rev = attrset["rev"]
+        self.hash = attrset["hash"] if "hash" in attrset else attrset["sha256"]
+
     def git_url(self) -> str:
-        url = f"git@{self.domain}:{self.group}/{self.owner}/{self.repo}.git"
+        url = f"git@github.com:{self.owner}/{self.repo}.git"
         print(f"git_url: {url}")
         return url
 
     def https_url(self) -> str:
-        url = f"https://{self.domain}/{self.group}/{self.owner}/{self.repo}"
+        url = f"https://github.com/{self.owner}/{self.repo}"
         print(f"git_url: {url}")
         return url
 
@@ -103,7 +104,7 @@ def get_src_value(ctx, filename):
     v = src_value[0].split("=")
     if re.match(r"^\W*fetchFromGitLab\W*$", v[0]):
         ctx.obj.isGitLab = True
-    if re.match(r"^\W*fetchFromGithub\W*$", v[0]):
+    if re.match(r"^\W*fetchFromGitHub\W*$", v[0]):
         ctx.obj.isGithub = True
     elif re.match(".*/.*", v[0]):
         print("It's Path")
@@ -125,7 +126,7 @@ def get_src_value(ctx, filename):
     if ctx.obj.isGitLab:
         ctx.obj.gitlab = GitLab(attrset)
     elif ctx.obj.isGithub:
-        ctx.obj.github = Github(**attrset)
+        ctx.obj.github = Github(attrset)
     print(f"{attrset}")
 
 
@@ -149,8 +150,13 @@ def update(ctx, filename):
             https_url = ctx.obj.gitlab.https_url()
             commit_prev = ctx.obj.gitlab.rev
             hash_prev = ctx.obj.gitlab.hash
+        elif ctx.obj.isGithub:
+            git_url = ctx.obj.github.git_url()
+            https_url = ctx.obj.github.https_url()
+            commit_prev = ctx.obj.github.rev
+            hash_prev = ctx.obj.github.hash
         else:
-            print("Only Gitlab is supported (ATM)")
+            print("Only Gitlab and Gihub are supported (ATM)")
             exit(1)
         commit = get_last_commit(git_url)
         if commit == commit_prev:
