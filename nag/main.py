@@ -65,9 +65,16 @@ class Nag(object):
         self.github = None
 
 
-def get_last_commit(git_url):
+def get_last_commit(git_url, head=None):
     commit_lst = check_output(["git", "ls-remote", git_url]).decode()
-    return commit_lst.split()[0]
+    if head:
+        for line in commit_lst.split("\n"):
+            col = line.split()
+            if col[1] == f"refs/heads/{head}":
+                return col[0]
+        raise Exception(f"Head: {head} not found")
+    else:
+        return commit_lst.split()[0]
 
 
 def nix_prefetch_git(https_url, commit):
@@ -138,9 +145,15 @@ def cli(ctx, debug):
 
 
 @cli.command()
+@click.option(
+    "--head",
+    type=click.STRING,
+    default=None,
+    help="specify git head to consider (ex branch)",
+)
 @click.argument("filename", type=click.Path(exists=True))
 @click.pass_context
-def update(ctx, filename):
+def update(ctx, filename, head):
 
     get_src_value(ctx, filename)
 
@@ -158,7 +171,7 @@ def update(ctx, filename):
         else:
             print("Only Gitlab and Gihub are supported (ATM)")
             exit(1)
-        commit = get_last_commit(git_url)
+        commit = get_last_commit(git_url, head)
         if commit == commit_prev:
             print("Nothing to do, no more recent commit")
             exit(0)
