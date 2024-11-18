@@ -1,3 +1,4 @@
+import json
 import re
 from subprocess import check_output
 
@@ -14,19 +15,28 @@ class GitLab:
 
     def __init__(self, attrset):
         self.domain = attrset["domain"]
-        self.group = attrset["group"]
+        if "group" in attrset:
+            self.group = attrset["group"]
+        else:
+            self.group = None
         self.owner = attrset["owner"]
         self.repo = attrset["repo"]
         self.rev = attrset["rev"]
         self.hash = attrset["hash"] if "hash" in attrset else attrset["sha256"]
 
     def git_url(self) -> str:
-        url = f"git@{self.domain}:{self.group}/{self.owner}/{self.repo}.git"
+        if self.group:
+            url = f"git@{self.domain}:{self.group}/{self.owner}/{self.repo}.git"
+        else:
+            url = f"git@{self.domain}:{self.owner}/{self.repo}.git"
         print(f"git_url: {url}")
         return url
 
     def https_url(self) -> str:
-        url = f"https://{self.domain}/{self.group}/{self.owner}/{self.repo}"
+        if self.group:
+            url = f"https://{self.domain}/{self.group}/{self.owner}/{self.repo}"
+        else:
+            url = f"https://{self.domain}/{self.owner}/{self.repo}"
         print(f"git_url: {url}")
         return url
 
@@ -78,10 +88,16 @@ def get_last_commit(git_url, head=None):
 
 
 def nix_prefetch_git(https_url, commit):
-    result = check_output(["nix-prefetch-git", https_url, commit]).decode()
-    hash = re.search("sha256-.+=", result).group(0)
-    print(hash)
-    return hash
+    result = check_output(["nix-prefetch-git", "--quiet", https_url, commit]).decode()
+    if result:
+        res = json.loads(result)
+        if "hash" in res:
+            print(res["hash"])
+            return res["hash"]
+
+    click.echo("Failed to obtain hash", err=True)
+    exit(1)
+    return
 
 
 def get_attr_val(attr_val, filename):
@@ -159,19 +175,21 @@ def update(ctx, filename, head):
 
     if not ctx.obj.isSrcPath:
         if ctx.obj.isGitLab:
-            git_url = ctx.obj.gitlab.git_url()
+            # git_url = ctx.obj.gitlab.git_url()
             https_url = ctx.obj.gitlab.https_url()
             commit_prev = ctx.obj.gitlab.rev
             hash_prev = ctx.obj.gitlab.hash
         elif ctx.obj.isGithub:
-            git_url = ctx.obj.github.git_url()
+            # git_url = ctx.obj.github.git_url()
             https_url = ctx.obj.github.https_url()
             commit_prev = ctx.obj.github.rev
             hash_prev = ctx.obj.github.hash
         else:
             print("Only Gitlab and Gihub are supported (ATM)")
             exit(1)
-        commit = get_last_commit(git_url, head)
+        # TODO add fallback to git_url if https_url use failed
+        # commit = get_last_commit(git_url, head)
+        commit = get_last_commit(https_url, head)
         if commit == commit_prev:
             print("Nothing to do, no more recent commit")
             exit(0)

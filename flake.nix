@@ -71,6 +71,7 @@
               pythonEnv = with pkgs.python3Packages; [
                 pytest
                 click
+		            pyparsing
               ];
             in
               pkgs.mkShell {
